@@ -32,5 +32,8 @@ Accept: application/json
 GET {{baseUrl}}/api/v1/products/search?minPrice=400000&maxPrice=200000
 Accept: application/json
 
-
+### Test CORS
+GET {{baseUrl}}/api/v1/products
+Origin: http://localhost:5173
+Accept: application/json
 

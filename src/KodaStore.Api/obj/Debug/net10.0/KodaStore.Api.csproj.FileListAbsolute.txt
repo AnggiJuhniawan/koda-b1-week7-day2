@@ -296,3 +296,9 @@ C:\Users\User01\Documents\_DATA D\Batch 1\Example\WEEK 5\DOTNET2_Day 3\src\KodaS
 C:\Users\User01\Documents\_DATA D\Batch 1\Example\WEEK 5\DOTNET2_Day 3\src\KodaStore.Api\obj\Debug\net10.0\KodaStore.Api.pdb
 C:\Users\User01\Documents\_DATA D\Batch 1\Example\WEEK 5\DOTNET2_Day 3\src\KodaStore.Api\obj\Debug\net10.0\KodaStore.Api.genruntimeconfig.cache
 C:\Users\User01\Documents\_DATA D\Batch 1\Example\WEEK 5\DOTNET2_Day 3\src\KodaStore.Api\obj\Debug\net10.0\ref\KodaStore.Api.dll
+C:\Users\User01\Documents\_DATA D\Batch 1\Example\WEEK 5\DOTNET2_Day 3\src\KodaStore.Api\bin\Debug\net10.0\KodaStore.Application.dll
+C:\Users\User01\Documents\_DATA D\Batch 1\Example\WEEK 5\DOTNET2_Day 3\src\KodaStore.Api\bin\Debug\net10.0\KodaStore.Domain.dll
+C:\Users\User01\Documents\_DATA D\Batch 1\Example\WEEK 5\DOTNET2_Day 3\src\KodaStore.Api\bin\Debug\net10.0\KodaStore.Infrastructure.dll
+C:\Users\User01\Documents\_DATA D\Batch 1\Example\WEEK 5\DOTNET2_Day 3\src\KodaStore.Api\bin\Debug\net10.0\KodaStore.Application.pdb
+C:\Users\User01\Documents\_DATA D\Batch 1\Example\WEEK 5\DOTNET2_Day 3\src\KodaStore.Api\bin\Debug\net10.0\KodaStore.Infrastructure.pdb
+C:\Users\User01\Documents\_DATA D\Batch 1\Example\WEEK 5\DOTNET2_Day 3\src\KodaStore.Api\bin\Debug\net10.0\KodaStore.Domain.pdb

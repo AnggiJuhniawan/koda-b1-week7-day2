@@ -4,6 +4,7 @@ using KodaStore.Application.DTOs;
 using KodaStore.Domain.Entities;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace KodaStore.Application.Repositories;
 

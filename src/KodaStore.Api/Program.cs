@@ -1,4 +1,5 @@
-﻿using KodaStore.Application.Services;
+﻿using KodaStore.Api.Middleware;
+using KodaStore.Application.Services;
 using KodaStore.Infrastructure;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -39,6 +40,21 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<IProductQueryService, ProductQueryService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 
+// Membaca daftar origin di env.Development
+var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>() ?? [];
+
+// Daftarkan Configuration CORS
+builder.Services.AddCors(option =>
+{
+    option.AddPolicy("ReactClient", policy =>
+    {
+        policy.WithOrigins(allowedOrigins)
+        .AllowAnyHeader()
+        .AllowAnyMethod();
+    });
+});
 
 // DBCONTEXT
 // var connectionString = builder.Configuration.GetConnectionString("ecommercedb")
@@ -84,9 +100,10 @@ else
     app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
 }
-
+app.UseMiddleware<RequestTimingMiddleware>();
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseCors("ReactClient");
 app.UseRouting();
 
 app.UseRateLimiter();
