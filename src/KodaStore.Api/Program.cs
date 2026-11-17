@@ -86,6 +86,14 @@ builder.Services.AddRateLimiter(option =>
         limiter.PermitLimit = 8;
         limiter.QueueLimit = 0;
     });
+
+    // Untuk Login
+    option.AddFixedWindowLimiter("LoginLimiter", limiter =>
+    {
+        limiter.PermitLimit = 3;
+        limiter.Window = TimeSpan.FromMinutes(3);
+        limiter.QueueLimit = 0;
+    });
 });
 
 var app = builder.Build();
