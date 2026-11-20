@@ -1,4 +1,5 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
+using System.Threading.RateLimiting;
 using KodaStore.Api.Middleware;
 using KodaStore.Application.Services;
 using KodaStore.Infrastructure;
@@ -91,7 +92,9 @@ builder.Services.AddCors(option =>
     {
         policy.WithOrigins(allowedOrigins)
         .AllowAnyHeader()
-        .AllowAnyMethod();
+        .AllowAnyMethod()
+        .AllowCredentials();
+
     });
 });
 
@@ -105,12 +108,60 @@ builder.Services.AddRateLimiter(option =>
     });
 
     // Untuk Login
-    option.AddFixedWindowLimiter("LoginLimiter", limiter =>
+    option.AddPolicy("auth-login", context =>
     {
-        limiter.PermitLimit = 3;
-        limiter.Window = TimeSpan.FromMinutes(3);
-        limiter.QueueLimit = 0;
+        var ip = context.Connection.RemoteIpAddress?.ToString() ?? "Nihil";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: $"login:{ip}",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(3),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }
+        );
     });
+
+    option.AddPolicy("auth-register", context =>
+    {
+        var ip = context.Connection.RemoteIpAddress?.ToString() ?? "Nihil";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: $"register:{ip}",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(10),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }
+        );
+    });
+
+    option.AddPolicy("auth-refresh", context =>
+    {
+        var ip = context.Connection.RemoteIpAddress?.ToString() ?? "Nihil";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: $"refresh:{ip}",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(2),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }
+        );
+    });
+
+    // option.AddFixedWindowLimiter("LoginLimiter", limiter =>
+    // {
+    //     limiter.PermitLimit = 3;
+    //     limiter.Window = TimeSpan.FromMinutes(3);
+    //     limiter.QueueLimit = 0;
+    // });
 });
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

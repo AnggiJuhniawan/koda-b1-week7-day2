@@ -9,9 +9,9 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace KodaStore.Infrastructure.Identity;
 
-public sealed class JwtTokenService(JwtOptions _options) : IJwtTokenService
+public sealed class JwtTokenService(IOptions<JwtOptions> options) : IJwtTokenService
 {
-
+    private readonly JwtOptions _options = options.Value;
     public IssuedAccessToken IssueAccessToken(AuthUserResponse user)
     {
         var now = DateTimeOffset.UtcNow;

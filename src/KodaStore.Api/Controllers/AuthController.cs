@@ -10,12 +10,18 @@ namespace KodaStore.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/auth")]
-public sealed class AuthController(IAuthService authService, IJwtTokenService jwtTokenService) : ControllerBase
+public sealed class AuthController(IAuthService authService, IRefreshTokenService refreshTokenService, IWebHostEnvironment environment, IConfiguration configuration) : ControllerBase
 {
+    private const string RefreshCookieName = "koda_refresh";
     private readonly IAuthService _authService = authService;
-    private readonly IJwtTokenService _jwtTokenService = jwtTokenService;
+    private readonly IRefreshTokenService _refreshTokenService = refreshTokenService;
+    private readonly IWebHostEnvironment _environment = environment;
+    private readonly IConfiguration _configuration = configuration;
 
+
+    [AllowAnonymous]
     [HttpPost("register")]
+    [EnableRateLimiting("auth-register")]
     [ProducesResponseType(typeof(AuthUserResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
@@ -47,8 +53,9 @@ public sealed class AuthController(IAuthService authService, IJwtTokenService jw
         return BadRequest(problem);
     }
 
+    [AllowAnonymous]
     [HttpPost("login")]
-    [EnableRateLimiting("LoginLimiter")]
+    [EnableRateLimiting("auth-login")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
@@ -67,15 +74,21 @@ public sealed class AuthController(IAuthService authService, IJwtTokenService jw
             });
         }
 
-        var user = result.User!;
+        // var user = result.User!;
+        var session = await _refreshTokenService
+            .CreateSessionAsync(result.User, ct);
 
-        var issueToken = _jwtTokenService.IssueAccessToken(user);
+        WriteRefreshCookie(session.RawRefreshToken, session.RefreshExpiredAtUtc);
+
+        Response.Headers.CacheControl = "no-store";
+
+        // var issueToken = _jwtTokenService.IssueAccessToken(user);
 
         var response = new LoginResponse(Message: "Akun berhasil diverifikasi",
-            User: user,
-            AccessToken: issueToken.AccessToken,
+            User: session.User,
+            AccessToken: session.AccessToken.AccessToken,
             TokenType: "Bearer",
-            ExpiresAtUtc: issueToken.ExpiredAtUtc
+            ExpiresAtUtc: session.AccessToken.ExpiredAtUtc
         );
 
         return Ok(response);
@@ -105,5 +118,121 @@ public sealed class AuthController(IAuthService authService, IJwtTokenService jw
         var response = new CurrentUserResponse(userId, email);
 
         return Ok(response);
+    }
+
+    // Refresh
+    [AllowAnonymous]
+    [EnableRateLimiting("auth-refresh")]
+    [HttpPost("refresh")]
+    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<LoginResponse>> Refresh(CancellationToken ct)
+    {
+        if (!IsTrustedOrigin())
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
+            {
+                Status = StatusCodes.Status403Forbidden,
+                Title = "Origin not allowed"
+            });
+        }
+
+        var rawToken = Request.Cookies[RefreshCookieName];
+        if (string.IsNullOrWhiteSpace(rawToken))
+        {
+            return Unauthorized(new ProblemDetails
+            {
+                Status = StatusCodes.Status401Unauthorized,
+                Title = "Refresh token not found"
+            });
+        }
+
+        var session = await _refreshTokenService.RotateAsync(rawToken, ct);
+        if (session is null)
+        {
+            DeleteRefreshCookie();
+            return Unauthorized(new ProblemDetails
+            {
+                Status = StatusCodes.Status401Unauthorized,
+                Title = "Invalid refresh token",
+                Detail = "Sesi tidak valid. Silakan login kembali."
+            });
+        }
+
+        WriteRefreshCookie(session.RawRefreshToken, session.RefreshExpiredAtUtc);
+        Response.Headers.CacheControl = "no-store";
+
+        return Ok(new LoginResponse(
+            Message: "Token berhasil diperbarui.",
+            User: session.User,
+            AccessToken: session.AccessToken.AccessToken,
+            TokenType: "Bearer",
+            ExpiresAtUtc: session.AccessToken.ExpiredAtUtc));
+    }
+
+    // LOGOUT
+    [AllowAnonymous]
+    [HttpPost("logout")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> Logout(CancellationToken cancellationToken)
+    {
+        if (!IsTrustedOrigin())
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
+            {
+                Status = StatusCodes.Status403Forbidden,
+                Title = "Origin not allowed"
+            });
+        }
+
+        var rawToken = Request.Cookies[RefreshCookieName];
+        if (!string.IsNullOrWhiteSpace(rawToken))
+        {
+            await _refreshTokenService.RevokeFamilyAsync(rawToken, cancellationToken);
+        }
+
+        DeleteRefreshCookie();
+
+        return NoContent();
+    }
+
+    // HELPER
+    private void WriteRefreshCookie(string rawRefreshToken, DateTimeOffset expiresAtUtc)
+    {
+        Response.Cookies.Append(RefreshCookieName, rawRefreshToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = !_environment.IsDevelopment() || Request.IsHttps,
+            SameSite = SameSiteMode.Lax,
+            Path = "/api/v1/auth",
+            Expires = expiresAtUtc,
+            IsEssential = true
+        });
+    }
+
+    private void DeleteRefreshCookie()
+    {
+        Response.Cookies.Delete(RefreshCookieName, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = !_environment.IsDevelopment() || Request.IsHttps,
+            SameSite = SameSiteMode.Lax,
+            Path = "/api/v1/auth",
+        });
+    }
+    private bool IsTrustedOrigin()
+    {
+        var origin = Request.Headers.Origin.ToString();
+        if (string.IsNullOrWhiteSpace(origin))
+        {
+            return false;
+        }
+        var allowedOrigins = _configuration
+            .GetSection("Cors:AllowedOrigins")
+            .Get<string[]>() ?? [];
+
+        return allowedOrigins.Contains(origin, StringComparer.Ordinal);
     }
 }
